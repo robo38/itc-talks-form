@@ -1,8 +1,7 @@
 import crypto from "node:crypto";
 
 import { cookies } from "next/headers";
-
-export const STAFF_SESSION_COOKIE = "staff_session";
+import { STAFF_SESSION_COOKIE } from "@/lib/auth-constants";
 
 interface StaffSessionPayload {
   username: string;

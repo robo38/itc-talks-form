@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { createStaffSessionToken, getDefaultStaffUsername, verifyStaffPassword, STAFF_SESSION_COOKIE } from "@/lib/auth";
+import { STAFF_SESSION_COOKIE } from "@/lib/auth-constants";
+import { createStaffSessionToken, getDefaultStaffUsername, verifyStaffPassword } from "@/lib/auth";
 
 const loginSchema = z.object({
   username: z.string().trim().min(1).optional(),
