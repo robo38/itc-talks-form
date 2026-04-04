@@ -61,6 +61,27 @@ function resolveAppBaseUrl(): string {
   return "http://localhost:3000";
 }
 
+function toRecord(value: unknown): Record<string, unknown> {
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+
+  return {};
+}
+
+function buildTripettoMetadata(payload: unknown): Record<string, unknown> {
+  const data = toRecord(payload);
+  const nestedData = toRecord(data.data);
+  const submission = toRecord(data.submission);
+
+  return {
+    event: data.event ?? data.type ?? nestedData.event ?? null,
+    formId: data.formId ?? nestedData.formId ?? submission.formId ?? null,
+    submissionId: data.submissionId ?? nestedData.submissionId ?? submission.id ?? null,
+    receivedAt: new Date().toISOString(),
+  };
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
 
@@ -126,7 +147,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         registrationId,
         ticketToken,
         qrValue,
-        rawPayload: payload as object,
+        tripettoMetadata: buildTripettoMetadata(payload),
+        rawPayload: toRecord(payload),
         customFields: extracted.customFields,
       },
     });

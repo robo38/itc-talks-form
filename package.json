@@ -4,22 +4,17 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "prisma generate",
     "build": "next build",
-    "vercel-build": "npm run prebuild && next build",
+    "vercel-build": "next build",
     "start": "next start",
-    "lint": "eslint",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma migrate deploy"
+    "lint": "eslint"
   },
   "dependencies": {
-    "@prisma/adapter-pg": "^7.6.0",
-    "@prisma/client": "^7.6.0",
     "dotenv": "^17.4.0",
+    "mongodb": "^6.21.0",
+    "mongoose": "^8.23.0",
     "next": "16.2.2",
     "nodemailer": "^8.0.4",
-    "pg": "^8.20.0",
     "qrcode": "^1.5.4",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -34,7 +29,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
-    "prisma": "^7.6.0",
     "tailwindcss": "^4.2.2",
     "typescript": "^5"
   }

@@ -22,13 +22,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const username = parsed.username?.trim() || getDefaultStaffUsername();
     const token = createStaffSessionToken(username);
+    const isHttps = new URL(request.url).protocol === "https:";
 
     const response = NextResponse.json({ ok: true, username }, { status: 200 });
     response.cookies.set({
       name: STAFF_SESSION_COOKIE,
       value: token,
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isHttps,
       sameSite: "lax",
       path: "/",
       maxAge: Number(process.env.STAFF_SESSION_TTL_HOURS ?? "12") * 60 * 60,
