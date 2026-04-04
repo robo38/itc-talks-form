@@ -143,7 +143,7 @@ export default function StaffCheckInClient({ initialToken }: Props) {
 
       try {
         const barcodes = await detectorRef.current.detect(videoRef.current);
-        const qr = barcodes.find((entry) => entry.rawValue);
+        const qr = barcodes.find((entry: DetectedBarcode) => entry.rawValue);
 
         if (qr?.rawValue) {
           const urlCandidate = qr.rawValue;
