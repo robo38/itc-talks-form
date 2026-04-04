@@ -5,7 +5,7 @@ Production-ready Next.js App Router application in TypeScript for:
 1. Receiving Tripetto webhook submissions
 2. Creating attendee registrations in PostgreSQL (Prisma)
 3. Generating secure ticket tokens and QR codes
-4. Sending attendee confirmation emails over SMTP (Nodemailer)
+4. Sending attendee confirmation emails (Resend preferred, SMTP fallback)
 5. Running protected staff-only check-in workflows
 
 ## Tech Stack
@@ -15,7 +15,7 @@ Production-ready Next.js App Router application in TypeScript for:
 3. Zod validation
 4. Prisma + PostgreSQL
 5. QRCode package (`qrcode`)
-6. Nodemailer (SMTP)
+6. Resend API (preferred) + Nodemailer SMTP fallback
 
 ## File Structure
 
@@ -67,16 +67,19 @@ cp .env.example .env.local
 Required values:
 
 1. `DATABASE_URL` for PostgreSQL
-2. `TRIPETTO_WEBHOOK_SECRET`
-3. `APP_BASE_URL`
+2. `WEBHOOK_TOKEN`
+3. `APP_BASE_URL` (optional on Vercel; falls back to `VERCEL_URL`)
 4. `STAFF_AUTH_SECRET`
 5. `STAFF_LOGIN_PASSWORD`
-6. `EVENT_FROM_EMAIL`
+6. `EMAIL_PROVIDER=smtp` (default)
+7. `EMAIL_FROM` (or `EVENT_FROM_EMAIL` / `SMTP_USER` fallback)
 
 Email transport behavior:
 
-1. Email is sent via SMTP using Nodemailer.
-2. Configure SMTP credentials in environment variables.
+1. Default provider is SMTP (`EMAIL_PROVIDER=smtp`) so no custom email domain service is required.
+2. Resend is only used when `EMAIL_PROVIDER=resend` and `RESEND_API_KEY` are set.
+3. If Resend fails, SMTP fallback is used.
+3. `ADMIN_EMAIL` is optional and receives a copy of each submission.
 
 ## Local Setup
 
@@ -112,11 +115,14 @@ npm run dev
 
 Behavior:
 
-1. Validates signature (`x-tripetto-signature`, `tripetto-signature`, or `x-webhook-signature`)
-2. Parses payload and extracts attendee fields
-3. Creates registration record with unique `registrationId` and `ticketToken`
-4. Builds secure QR value (`APP_BASE_URL/staff/check-in?token=...`)
-5. Sends styled HTML confirmation email with embedded QR image
+1. Validates `token` query parameter against `WEBHOOK_TOKEN`
+2. Reads raw body via `request.text()` and logs headers + raw payload for debugging
+3. Optionally validates signature (`x-tripetto-signature`, `tripetto-signature`, or `x-webhook-signature`) only when both header and `TRIPETTO_WEBHOOK_SECRET` are present
+4. Parses payload and extracts attendee fields
+5. Creates registration record with unique `registrationId` and `ticketToken`
+6. Builds secure QR value (`APP_BASE_URL/staff/check-in?token=...`)
+7. Sends styled HTML confirmation email with embedded QR image and plain-text fallback
+8. Optionally sends admin notification email when `ADMIN_EMAIL` is configured
 
 ### 2) Staff check-in mutation
 
@@ -219,10 +225,11 @@ npm run prisma:deploy
 
 1. Deploy app and get your production URL, e.g. `https://your-app.vercel.app`
 2. In Tripetto webhook settings set endpoint to:
-	 `https://your-app.vercel.app/api/tripetto-webhook`
-3. Configure secret in Tripetto and match `TRIPETTO_WEBHOOK_SECRET`
-4. Send a test submission from Tripetto
-5. Verify registration row in DB and confirmation email delivery
+	 `https://your-app.vercel.app/api/tripetto-webhook?token=YOUR_SECRET`
+3. Set `WEBHOOK_TOKEN=YOUR_SECRET` in your deployment environment
+4. Optional: configure signature secret in Tripetto and match `TRIPETTO_WEBHOOK_SECRET`
+5. Send a test submission from Tripetto
+6. Verify registration row in DB and confirmation email delivery
 
 ## Create Staff Login and Test
 
@@ -236,5 +243,6 @@ npm run prisma:deploy
 
 1. QR encodes only secure token URL, not personal PII.
 2. Public QR scans cannot check in attendees without staff authentication.
-3. Webhook signatures are verified before processing payload.
+3. Webhook requests require a secret URL token before processing.
+4. Signature validation is available as an optional hardening layer.
 4. Sensitive settings are read only from environment variables.

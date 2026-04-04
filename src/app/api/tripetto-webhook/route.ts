@@ -1,8 +1,11 @@
+import crypto from "node:crypto";
+
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/email";
+import { adminSubmissionTemplate } from "@/lib/emailTemplates/adminSubmission";
 import { attendeeConfirmationTemplate } from "@/lib/emailTemplates/attendeeConfirmation";
 import { extractTripettoFields } from "@/lib/extractTripettoFields";
 import { generateQrCodeDataUrl } from "@/lib/generateQrCode";
@@ -16,6 +19,26 @@ function getSignatureHeader(request: Request): string | null {
   return request.headers.get("x-tripetto-signature") || request.headers.get("tripetto-signature") || request.headers.get("x-webhook-signature");
 }
 
+function timingSafeEqualString(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  if (leftBuffer.length !== rightBuffer.length || leftBuffer.length === 0) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function hasValidWebhookToken(request: Request, expectedToken: string): boolean {
+  const actualToken = new URL(request.url).searchParams.get("token")?.trim();
+  if (!actualToken) {
+    return false;
+  }
+
+  return timingSafeEqualString(actualToken, expectedToken);
+}
+
 function logInfo(message: string, details: Record<string, unknown>): void {
   console.info(JSON.stringify({ level: "info", message, timestamp: new Date().toISOString(), ...details }));
 }
@@ -24,31 +47,61 @@ function logError(message: string, details: Record<string, unknown>): void {
   console.error(JSON.stringify({ level: "error", message, timestamp: new Date().toISOString(), ...details }));
 }
 
+function resolveAppBaseUrl(): string {
+  const explicit = process.env.APP_BASE_URL?.trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const vercelUrl = process.env.VERCEL_URL?.trim();
+  if (vercelUrl) {
+    return `https://${vercelUrl}`;
+  }
+
+  return "http://localhost:3000";
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
 
   try {
-    const secret = process.env.TRIPETTO_WEBHOOK_SECRET?.trim();
-    if (!secret) {
-      return NextResponse.json({ ok: false, error: "Missing TRIPETTO_WEBHOOK_SECRET", requestId }, { status: 500 });
+    const webhookToken = process.env.WEBHOOK_TOKEN?.trim();
+    if (!webhookToken) {
+      return NextResponse.json({ ok: false, error: "Missing WEBHOOK_TOKEN", requestId }, { status: 500 });
     }
 
-    const appBaseUrl = process.env.APP_BASE_URL?.trim();
-    if (!appBaseUrl) {
-      return NextResponse.json({ ok: false, error: "Missing APP_BASE_URL", requestId }, { status: 500 });
+    if (!hasValidWebhookToken(request, webhookToken)) {
+      logError("Webhook token verification failed", { requestId });
+      return NextResponse.json({ ok: false, error: "Invalid webhook token", requestId }, { status: 401 });
     }
+
+    const appBaseUrl = resolveAppBaseUrl();
 
     const rawBody = await request.text();
     if (!rawBody.trim()) {
       return NextResponse.json({ ok: false, error: "Empty request body", requestId }, { status: 400 });
     }
 
-    const signatureHeader = getSignatureHeader(request);
-    const validSignature = verifyTripettoSignature(rawBody, signatureHeader, secret);
+    const headers = Object.fromEntries(request.headers.entries());
+    logInfo("Tripetto webhook payload received", {
+      requestId,
+      headers,
+      rawBody,
+    });
 
-    if (!validSignature) {
-      logError("Tripetto signature verification failed", { requestId });
-      return NextResponse.json({ ok: false, error: "Invalid signature", requestId }, { status: 401 });
+    const signatureHeader = getSignatureHeader(request);
+    const secret = process.env.TRIPETTO_WEBHOOK_SECRET?.trim();
+    if (signatureHeader && secret) {
+      const validSignature = verifyTripettoSignature(rawBody, signatureHeader, secret);
+      if (!validSignature) {
+        logError("Tripetto signature verification failed", { requestId });
+        return NextResponse.json({ ok: false, error: "Invalid signature", requestId }, { status: 401 });
+      }
+    } else {
+      logInfo("Tripetto signature verification skipped", {
+        requestId,
+        reason: signatureHeader ? "missing TRIPETTO_WEBHOOK_SECRET" : "missing signature header",
+      });
     }
 
     let payload: unknown;
@@ -85,18 +138,91 @@ export async function POST(request: Request): Promise<NextResponse> {
       qrValue,
     });
 
-    const sent = await sendEmail({
-      to: extracted.email,
-      subject: email.subject,
-      html: email.html,
-      text: email.text,
-    });
+    let attendeeEmail: { status: "sent" | "failed"; provider: string | null; error: string | null } = {
+      status: "sent",
+      provider: null,
+      error: null,
+    };
+
+    try {
+      const sent = await sendEmail({
+        to: extracted.email,
+        subject: email.subject,
+        html: email.html,
+        text: email.text,
+      });
+
+      attendeeEmail = {
+        status: "sent",
+        provider: sent.provider,
+        error: null,
+      };
+    } catch (error) {
+      attendeeEmail = {
+        status: "failed",
+        provider: null,
+        error: error instanceof Error ? error.message : "Unknown email error",
+      };
+
+      logError("Attendee email send failed", {
+        requestId,
+        registrationId,
+        attendeeEmail: extracted.email,
+        error: attendeeEmail.error,
+      });
+    }
+
+    let adminEmail: { status: "disabled" | "sent" | "failed"; provider: string | null; error: string | null } = {
+      status: "disabled",
+      provider: null,
+      error: null,
+    };
+
+    const adminRecipient = process.env.ADMIN_EMAIL?.trim();
+    if (adminRecipient) {
+      const adminTemplate = adminSubmissionTemplate({
+        attendeeName: extracted.fullName,
+        attendeeEmail: extracted.email,
+        registrationId,
+        ticketToken,
+        customFields: extracted.customFields,
+      });
+
+      try {
+        const sent = await sendEmail({
+          to: adminRecipient,
+          subject: adminTemplate.subject,
+          html: adminTemplate.html,
+          text: adminTemplate.text,
+        });
+
+        adminEmail = {
+          status: "sent",
+          provider: sent.provider,
+          error: null,
+        };
+      } catch (error) {
+        adminEmail = {
+          status: "failed",
+          provider: null,
+          error: error instanceof Error ? error.message : "Unknown email error",
+        };
+
+        logError("Admin email send failed", {
+          requestId,
+          registrationId,
+          adminEmail: adminRecipient,
+          error: adminEmail.error,
+        });
+      }
+    }
 
     logInfo("Tripetto registration created", {
       requestId,
       registrationId,
-      emailProvider: sent.provider,
       attendeeEmail: extracted.email,
+      attendeeEmailDelivery: attendeeEmail,
+      adminEmailDelivery: adminEmail,
     });
 
     return NextResponse.json(
@@ -109,8 +235,12 @@ export async function POST(request: Request): Promise<NextResponse> {
           checkInStatus: registration.checkInStatus,
           createdAt: registration.createdAt,
         },
+        emails: {
+          attendee: attendeeEmail,
+          admin: adminEmail,
+        },
       },
-      { status: 201 },
+      { status: 200 },
     );
   } catch (error) {
     if (error instanceof z.ZodError) {
