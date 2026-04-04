@@ -82,6 +82,39 @@ function buildTripettoMetadata(payload: unknown): Record<string, unknown> {
   };
 }
 
+function isLikelyTripettoTemplatePayload(payload: unknown): boolean {
+  const root = toRecord(payload);
+  const placeholderValues = new Set(["string", "text", "numeric", "number", "boolean", "date", "datetime", "email"]);
+
+  const candidateEntries = Object.entries(root).filter(([key, value]) => {
+    if (key.toLowerCase().startsWith("tripetto")) {
+      return false;
+    }
+
+    return typeof value === "string";
+  });
+
+  if (candidateEntries.length === 0) {
+    return false;
+  }
+
+  const normalizedValues = candidateEntries
+    .map(([, value]) => (value as string).trim().toLowerCase())
+    .filter((value) => value.length > 0);
+
+  if (normalizedValues.length === 0) {
+    return false;
+  }
+
+  const placeholderCount = normalizedValues.filter((value) => placeholderValues.has(value)).length;
+
+  const emailEntry = candidateEntries.find(([key]) => key.toLowerCase().includes("email"));
+  const emailLooksLikePlaceholder =
+    typeof emailEntry?.[1] === "string" && placeholderValues.has(emailEntry[1].trim().toLowerCase());
+
+  return emailLooksLikePlaceholder && placeholderCount >= Math.ceil(normalizedValues.length * 0.5);
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   const requestId = crypto.randomUUID();
 
@@ -130,6 +163,23 @@ export async function POST(request: Request): Promise<NextResponse> {
       payload = JSON.parse(rawBody);
     } catch {
       return NextResponse.json({ ok: false, error: "Malformed JSON payload", requestId }, { status: 400 });
+    }
+
+    if (isLikelyTripettoTemplatePayload(payload)) {
+      logInfo("Tripetto template payload ignored", {
+        requestId,
+        reason: "Payload contains placeholder values instead of attendee data",
+      });
+
+      return NextResponse.json(
+        {
+          ok: true,
+          requestId,
+          ignored: true,
+          reason: "Tripetto template/test payload ignored",
+        },
+        { status: 200 },
+      );
     }
 
     const extracted = extractTripettoFields(payload);
