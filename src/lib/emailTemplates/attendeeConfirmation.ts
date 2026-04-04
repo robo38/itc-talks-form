@@ -1,7 +1,7 @@
 interface ConfirmationTemplateInput {
   attendeeName: string;
   registrationId: string;
-  qrCodeDataUrl: string;
+  qrCodeImageUrl: string;
   qrValue: string;
 }
 
@@ -21,6 +21,7 @@ export function attendeeConfirmationTemplate(input: ConfirmationTemplateInput): 
 } {
   const safeName = sanitizeHtml(input.attendeeName);
   const safeRegistrationId = sanitizeHtml(input.registrationId);
+  const safeQrImageUrl = sanitizeHtml(input.qrCodeImageUrl);
 
   const subject = "Your event ticket and QR check-in pass";
 
@@ -43,7 +44,7 @@ export function attendeeConfirmationTemplate(input: ConfirmationTemplateInput): 
           </tr>
           <tr>
             <td align="center" style="padding:10px 28px 16px;">
-              <img src="${input.qrCodeDataUrl}" alt="Ticket QR Code" width="220" height="220" style="display:block;border-radius:12px;border:1px solid #d1d5db;background:#ffffff;padding:10px;" />
+              <img src="${safeQrImageUrl}" alt="Ticket QR Code" width="220" height="220" style="display:block;border-radius:12px;border:1px solid #d1d5db;background:#ffffff;padding:10px;" />
             </td>
           </tr>
           <tr>

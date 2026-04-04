@@ -8,7 +8,6 @@ import { sendEmail } from "@/lib/email";
 import { adminSubmissionTemplate } from "@/lib/emailTemplates/adminSubmission";
 import { attendeeConfirmationTemplate } from "@/lib/emailTemplates/attendeeConfirmation";
 import { extractTripettoFields } from "@/lib/extractTripettoFields";
-import { generateQrCodeDataUrl } from "@/lib/generateQrCode";
 import { generateRegistrationId } from "@/lib/generateRegistrationId";
 import { generateTicketToken } from "@/lib/generateTicketToken";
 import { verifyTripettoSignature } from "@/lib/tripettoSignature";
@@ -209,7 +208,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const registrationId = generateRegistrationId();
     const ticketToken = generateTicketToken();
     const qrValue = `${appBaseUrl.replace(/\/$/, "")}/staff/check-in?token=${encodeURIComponent(ticketToken)}`;
-    const qrCodeDataUrl = await generateQrCodeDataUrl(qrValue);
+    const qrCodeImageUrl = `${appBaseUrl.replace(/\/$/, "")}/api/qr/${encodeURIComponent(ticketToken)}`;
 
     const registration = await db.registration.create({
       data: {
@@ -228,7 +227,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const email = attendeeConfirmationTemplate({
       attendeeName: extracted.fullName,
       registrationId,
-      qrCodeDataUrl,
+      qrCodeImageUrl,
       qrValue,
     });
 
