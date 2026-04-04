@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { db } from "@/lib/db";
-import { sendEmailWithFallback } from "@/lib/email";
+import { sendEmail } from "@/lib/email";
 import { attendeeConfirmationTemplate } from "@/lib/emailTemplates/attendeeConfirmation";
 import { extractTripettoFields } from "@/lib/extractTripettoFields";
 import { generateQrCodeDataUrl } from "@/lib/generateQrCode";
@@ -85,7 +85,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       qrValue,
     });
 
-    const sent = await sendEmailWithFallback({
+    const sent = await sendEmail({
       to: extracted.email,
       subject: email.subject,
       html: email.html,

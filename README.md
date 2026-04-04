@@ -5,7 +5,7 @@ Production-ready Next.js App Router application in TypeScript for:
 1. Receiving Tripetto webhook submissions
 2. Creating attendee registrations in PostgreSQL (Prisma)
 3. Generating secure ticket tokens and QR codes
-4. Sending attendee confirmation emails (Resend preferred, Nodemailer fallback)
+4. Sending attendee confirmation emails over SMTP (Nodemailer)
 5. Running protected staff-only check-in workflows
 
 ## Tech Stack
@@ -15,7 +15,7 @@ Production-ready Next.js App Router application in TypeScript for:
 3. Zod validation
 4. Prisma + PostgreSQL
 5. QRCode package (`qrcode`)
-6. Resend (primary) + Nodemailer (fallback)
+6. Nodemailer (SMTP)
 
 ## File Structure
 
@@ -75,8 +75,8 @@ Required values:
 
 Email transport behavior:
 
-1. If `RESEND_API_KEY` exists, email is sent with Resend.
-2. If Resend fails or is not configured, Nodemailer SMTP fallback is used.
+1. Email is sent via SMTP using Nodemailer.
+2. Configure SMTP credentials in environment variables.
 
 ## Local Setup
 
