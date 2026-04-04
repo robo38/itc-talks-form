@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { STAFF_SESSION_COOKIE } from "@/lib/auth-constants";
 
 function isProtectedRoute(pathname: string): boolean {
+  if (pathname === "/api/staff/login") {
+    return false;
+  }
+
   return pathname.startsWith("/staff/check-in") || pathname.startsWith("/api/staff") || pathname.startsWith("/api/registration");
 }
 
