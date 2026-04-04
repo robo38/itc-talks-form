@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CheckInStatus {
+  registered
+  checked_in
+}
+
+model Registration {
+  id             String        @id @default(cuid())
+  fullName       String
+  email          String
+  phone          String?
+  registrationId String        @unique
+  ticketToken    String        @unique
+  qrValue        String
+  checkInStatus  CheckInStatus @default(registered)
+  checkedInAt    DateTime?
+  checkedInBy    String?
+  rawPayload     Json
+  customFields   Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([email])
+  @@index([createdAt])
+}
