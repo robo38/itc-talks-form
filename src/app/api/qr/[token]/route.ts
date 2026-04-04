@@ -6,10 +6,16 @@ interface Params {
   params: Promise<{ token: string }>;
 }
 
-function resolveAppBaseUrl(): string {
+function resolveAppBaseUrl(request: Request): string {
   const explicit = process.env.APP_BASE_URL?.trim();
   if (explicit) {
     return explicit;
+  }
+
+  const forwardedHost = request.headers.get("x-forwarded-host")?.trim() || request.headers.get("host")?.trim();
+  if (forwardedHost) {
+    const forwardedProto = request.headers.get("x-forwarded-proto")?.trim() || new URL(request.url).protocol.replace(":", "");
+    return `${forwardedProto}://${forwardedHost}`;
   }
 
   const vercelUrl = process.env.VERCEL_URL?.trim();
@@ -20,14 +26,14 @@ function resolveAppBaseUrl(): string {
   return "http://localhost:3000";
 }
 
-export async function GET(_: Request, context: Params): Promise<Response> {
+export async function GET(request: Request, context: Params): Promise<Response> {
   const { token } = await context.params;
 
   if (!token || token.trim().length < 8) {
     return new Response("Invalid token", { status: 400 });
   }
 
-  const appBaseUrl = resolveAppBaseUrl();
+  const appBaseUrl = resolveAppBaseUrl(request);
   const qrValue = `${appBaseUrl.replace(/\/$/, "")}/staff/check-in?token=${encodeURIComponent(token)}`;
   const pngBuffer = await generateQrCodePngBuffer(qrValue);
   const body = new Uint8Array(pngBuffer);

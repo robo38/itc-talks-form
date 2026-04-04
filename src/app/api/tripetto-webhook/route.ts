@@ -46,10 +46,16 @@ function logError(message: string, details: Record<string, unknown>): void {
   console.error(JSON.stringify({ level: "error", message, timestamp: new Date().toISOString(), ...details }));
 }
 
-function resolveAppBaseUrl(): string {
+function resolveAppBaseUrl(request: Request): string {
   const explicit = process.env.APP_BASE_URL?.trim();
   if (explicit) {
     return explicit;
+  }
+
+  const forwardedHost = request.headers.get("x-forwarded-host")?.trim() || request.headers.get("host")?.trim();
+  if (forwardedHost) {
+    const forwardedProto = request.headers.get("x-forwarded-proto")?.trim() || new URL(request.url).protocol.replace(":", "");
+    return `${forwardedProto}://${forwardedHost}`;
   }
 
   const vercelUrl = process.env.VERCEL_URL?.trim();
@@ -128,7 +134,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Invalid webhook token", requestId }, { status: 401 });
     }
 
-    const appBaseUrl = resolveAppBaseUrl();
+    const appBaseUrl = resolveAppBaseUrl(request);
 
     const rawBody = await request.text();
     if (!rawBody.trim()) {
