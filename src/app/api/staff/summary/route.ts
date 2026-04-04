@@ -1,4 +1,3 @@
-import { CheckInStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { getCurrentStaffUser } from "@/lib/auth";
@@ -14,7 +13,7 @@ export async function GET(): Promise<NextResponse> {
 
   const [totalRegistrations, checkedInCount, recent] = await Promise.all([
     db.registration.count(),
-    db.registration.count({ where: { checkInStatus: CheckInStatus.checked_in } }),
+    db.registration.count({ where: { checkInStatus: "checked_in" } }),
     db.registration.findMany({
       orderBy: { createdAt: "desc" },
       take: 6,

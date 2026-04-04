@@ -1,4 +1,3 @@
-import { CheckInStatus } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -29,7 +28,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ ok: false, error: "Invalid ticket token", status: "invalid" }, { status: 404 });
     }
 
-    if (registration.checkInStatus === CheckInStatus.checked_in) {
+    if (registration.checkInStatus === "checked_in") {
       return NextResponse.json({
         ok: true,
         status: "already_checked_in",
@@ -59,7 +58,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     const updated = await db.registration.update({
       where: { id: registration.id },
       data: {
-        checkInStatus: CheckInStatus.checked_in,
+        checkInStatus: "checked_in",
         checkedInAt: new Date(),
         checkedInBy: staffUser,
       },
