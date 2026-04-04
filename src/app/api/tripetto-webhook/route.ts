@@ -182,7 +182,29 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const extracted = extractTripettoFields(payload);
+    let extracted;
+    try {
+      extracted = extractTripettoFields(payload);
+    } catch (error) {
+      if (error instanceof z.ZodError && isLikelyTripettoTemplatePayload(payload)) {
+        logInfo("Tripetto template payload ignored after extraction validation", {
+          requestId,
+          reason: "Validation failed for placeholder payload",
+        });
+
+        return NextResponse.json(
+          {
+            ok: true,
+            requestId,
+            ignored: true,
+            reason: "Tripetto template/test payload ignored",
+          },
+          { status: 200 },
+        );
+      }
+
+      throw error;
+    }
 
     const registrationId = generateRegistrationId();
     const ticketToken = generateTicketToken();
