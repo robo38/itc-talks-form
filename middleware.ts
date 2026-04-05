@@ -3,11 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { STAFF_SESSION_COOKIE } from "@/lib/auth-constants";
 
 function isProtectedRoute(pathname: string): boolean {
-  if (pathname === "/api/staff/login") {
+  if (pathname === "/api/staff/login" || pathname === "/staff/login") {
     return false;
   }
 
-  return pathname.startsWith("/staff/check-in") || pathname.startsWith("/api/staff") || pathname.startsWith("/api/registration");
+  return pathname === "/staff" || pathname.startsWith("/staff/") || pathname.startsWith("/api/staff") || pathname.startsWith("/api/registration");
 }
 
 export function middleware(request: NextRequest): NextResponse {

@@ -42,6 +42,38 @@ interface UpdateRegistrationInput {
   checkedInBy?: string | null;
 }
 
+interface RegistrationWhereInput {
+  checkInStatus?: CheckInStatus;
+  search?: string;
+}
+
+interface FindManyRegistrationArgs {
+  where?: RegistrationWhereInput;
+  orderBy?: { createdAt?: "asc" | "desc" };
+  skip?: number;
+  take?: number;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildRegistrationFilter(where?: RegistrationWhereInput): Record<string, unknown> {
+  const filter: Record<string, unknown> = {};
+
+  if (where?.checkInStatus) {
+    filter.checkInStatus = where.checkInStatus;
+  }
+
+  const term = where?.search?.trim();
+  if (term) {
+    const searchRegex = new RegExp(escapeRegExp(term), "i");
+    filter.$or = [{ fullName: searchRegex }, { email: searchRegex }, { phone: searchRegex }, { registrationId: searchRegex }, { ticketToken: searchRegex }];
+  }
+
+  return filter;
+}
+
 function toRegistrationRecord(document: RegistrationDocument): RegistrationRecord {
   const payload = document.rawPayload;
   const custom = document.customFields;
@@ -96,20 +128,25 @@ export const db = {
       return toRegistrationRecord(updated as unknown as RegistrationDocument);
     },
 
-    async count(args?: { where?: Partial<Pick<RegistrationRecord, "checkInStatus">> }): Promise<number> {
+    async count(args?: { where?: RegistrationWhereInput }): Promise<number> {
       await connectToDatabase();
-      return RegistrationModel.countDocuments(args?.where ?? {});
+      return RegistrationModel.countDocuments(buildRegistrationFilter(args?.where));
     },
 
-    async findMany(args?: { orderBy?: { createdAt?: "asc" | "desc" }; take?: number }): Promise<RegistrationRecord[]> {
+    async findMany(args?: FindManyRegistrationArgs): Promise<RegistrationRecord[]> {
       await connectToDatabase();
       const sortDirection = args?.orderBy?.createdAt === "asc" ? 1 : -1;
-      const limit = args?.take ?? 0;
+      const query = RegistrationModel.find(buildRegistrationFilter(args?.where)).sort({ createdAt: sortDirection });
 
-      const rows = await RegistrationModel.find({})
-        .sort({ createdAt: sortDirection })
-        .limit(limit)
-        .exec();
+      if (typeof args?.skip === "number" && args.skip > 0) {
+        query.skip(args.skip);
+      }
+
+      if (typeof args?.take === "number" && args.take > 0) {
+        query.limit(args.take);
+      }
+
+      const rows = await query.exec();
 
       return rows.map((row) => toRegistrationRecord(row as unknown as RegistrationDocument));
     },

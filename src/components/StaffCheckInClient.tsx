@@ -190,9 +190,14 @@ export default function StaffCheckInClient({ initialToken }: Props) {
             <h1 className="text-2xl font-bold text-slate-900">Staff Check-In</h1>
             <p className="mt-1 text-sm text-slate-600">Scan attendee QR codes or paste ticket tokens manually.</p>
           </div>
-          <button onClick={handleLogout} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
-            Logout
-          </button>
+          <div className="flex items-center gap-2">
+            <a href="/staff/users" className="rounded-lg border border-cyan-700 px-3 py-2 text-sm font-semibold text-cyan-700 hover:bg-cyan-50">
+              All Users
+            </a>
+            <button onClick={handleLogout} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100">
+              Logout
+            </button>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-4 md:grid-cols-2">
